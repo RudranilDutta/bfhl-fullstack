@@ -7,7 +7,7 @@ A full-stack application that processes hierarchical node relationships, detects
 ## 🚀 Live Demo
 
 - 🔗 Frontend: https://bfhl-fullstack-one.vercel.app  
-- 🔗 Backend API: https://bfhl-fullstack-1b8j.onrender.com/bfhl  
+- 🔗 Backend API: https://rudranildutta-bfhlf.onrender.com/  
 
 ---
 

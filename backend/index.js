@@ -5,12 +5,11 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 
-// 🔐 Identity (REQUIRED)
 const USER_ID = 'RudranilDutta_18062005'
 const EMAIL_ID = 'rd1342@srmist.edu.in'
 const ROLL = 'RA2311003012264'
 
-// ✅ Valid pattern
+
 const VALID = /^([A-Z])->([A-Z])$/
 
 function analyze(input) {
@@ -19,7 +18,6 @@ function analyze(input) {
   const seen = new Set()
   const edges = []
 
-  // 🔹 Step 1: Validate + Remove duplicates
   for (let item of input) {
     const s = String(item).trim()
     const match = s.match(VALID)
@@ -40,7 +38,6 @@ function analyze(input) {
 
   const duplicate_edges = [...duplicateSet]
 
-  // 🔹 Step 2: Build graph
   const graph = new Map()
   const parent = new Map()
   const nodes = new Set()
@@ -49,7 +46,6 @@ function analyze(input) {
     nodes.add(p)
     nodes.add(c)
 
-    // Diamond case: first parent wins
     if (parent.has(c)) continue
 
     parent.set(c, p)
@@ -58,7 +54,6 @@ function analyze(input) {
     graph.get(p).push(c)
   }
 
-  // 🔹 Step 3: Detect cycle
   function hasCycle(node, visited = new Set(), stack = new Set()) {
     if (!visited.has(node)) {
       visited.add(node)
@@ -76,7 +71,6 @@ function analyze(input) {
     return false
   }
 
-  // 🔹 Step 4: Build tree
   function buildTree(node) {
     const obj = {}
     for (let child of (graph.get(node) || [])) {
@@ -85,14 +79,13 @@ function analyze(input) {
     return obj
   }
 
-  // 🔹 Step 5: Depth
+
   function getDepth(node) {
     const children = graph.get(node) || []
     if (children.length === 0) return 1
     return 1 + Math.max(...children.map(getDepth))
   }
 
-  // 🔹 Step 6: Process components
   const visited = new Set()
   const hierarchies = []
 
@@ -102,7 +95,7 @@ function analyze(input) {
     const comp = new Set()
     const stack = [node]
 
-    // Find connected component
+
     while (stack.length) {
       const curr = stack.pop()
       if (comp.has(curr)) continue
@@ -117,7 +110,6 @@ function analyze(input) {
 
     const cycle = [...comp].some(n => hasCycle(n))
 
-    // Find root
     const roots = [...comp].filter(n => !parent.has(n) || !comp.has(parent.get(n)))
     const root = roots.length ? roots.sort()[0] : [...comp].sort()[0]
 
@@ -136,7 +128,6 @@ function analyze(input) {
     }
   }
 
-  // 🔹 Step 7: Sort output
   hierarchies.sort((a, b) => {
     if (!!a.has_cycle !== !!b.has_cycle) return a.has_cycle ? 1 : -1
     return a.root.localeCompare(b.root)
@@ -166,7 +157,6 @@ function analyze(input) {
   }
 }
 
-// 🔹 API Route
 app.post('/bfhl', (req, res) => {
   if (!Array.isArray(req.body.data)) {
     return res.status(400).json({ error: "data must be an array" })
@@ -180,7 +170,7 @@ app.post('/bfhl', (req, res) => {
   }
 })
 
-// 🔹 Root Route (for browser check)
+
 app.get('/', (req, res) => {
   res.json({
     status: "BFHL API running 🚀",
@@ -189,6 +179,5 @@ app.get('/', (req, res) => {
   })
 })
 
-// 🔹 PORT FIX (IMPORTANT FOR DEPLOY)
 const PORT = process.env.PORT || 3000
 app.listen(PORT, () => console.log(`Server running on ${PORT}`))
