@@ -5,78 +5,96 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 
+// 🔐 Identity (REQUIRED)
 const USER_ID = 'RudranilDutta_18062005'
 const EMAIL_ID = 'rd1342@srmist.edu.in'
 const ROLL = 'RA2311003012264'
 
+// ✅ Valid pattern
 const VALID = /^([A-Z])->([A-Z])$/
 
 function analyze(input) {
-  const bad = []
-  const dup = []
+  const invalid_entries = []
+  const duplicateSet = new Set()
   const seen = new Set()
   const edges = []
 
-  for (let x of input) {
-    const s = String(x).trim()
-    const m = s.match(VALID)
+  // 🔹 Step 1: Validate + Remove duplicates
+  for (let item of input) {
+    const s = String(item).trim()
+    const match = s.match(VALID)
 
-    if (!m || m[1] === m[2]) {
-      bad.push(x)
+    if (!match || match[1] === match[2]) {
+      invalid_entries.push(item)
       continue
     }
 
     if (seen.has(s)) {
-      if (!dup.includes(s)) dup.push(s)
+      duplicateSet.add(s)
       continue
     }
 
     seen.add(s)
-    edges.push([m[1], m[2]])
+    edges.push([match[1], match[2]])
   }
 
+  const duplicate_edges = [...duplicateSet]
+
+  // 🔹 Step 2: Build graph
   const graph = new Map()
   const parent = new Map()
   const nodes = new Set()
 
-  for (let [a, b] of edges) {
-    nodes.add(a)
-    nodes.add(b)
+  for (let [p, c] of edges) {
+    nodes.add(p)
+    nodes.add(c)
 
-    if (parent.has(b)) continue
+    // Diamond case: first parent wins
+    if (parent.has(c)) continue
 
-    parent.set(b, a)
+    parent.set(c, p)
 
-    if (!graph.has(a)) graph.set(a, [])
-    graph.get(a).push(b)
+    if (!graph.has(p)) graph.set(p, [])
+    graph.get(p).push(c)
   }
 
-  function detectCycle(start, stack = new Set()) {
-    if (stack.has(start)) return true
-    stack.add(start)
+  // 🔹 Step 3: Detect cycle
+  function hasCycle(node, visited = new Set(), stack = new Set()) {
+    if (!visited.has(node)) {
+      visited.add(node)
+      stack.add(node)
 
-    for (let nxt of (graph.get(start) || [])) {
-      if (detectCycle(nxt, new Set(stack))) return true
+      for (let child of (graph.get(node) || [])) {
+        if (!visited.has(child) && hasCycle(child, visited, stack)) {
+          return true
+        } else if (stack.has(child)) {
+          return true
+        }
+      }
     }
+    stack.delete(node)
     return false
   }
 
-  function build(node) {
+  // 🔹 Step 4: Build tree
+  function buildTree(node) {
     const obj = {}
-    for (let c of (graph.get(node) || [])) {
-      obj[c] = build(c)
+    for (let child of (graph.get(node) || [])) {
+      obj[child] = buildTree(child)
     }
     return obj
   }
 
-  function depth(node) {
-    const kids = graph.get(node) || []
-    if (kids.length === 0) return 1
-    return 1 + Math.max(...kids.map(depth))
+  // 🔹 Step 5: Depth
+  function getDepth(node) {
+    const children = graph.get(node) || []
+    if (children.length === 0) return 1
+    return 1 + Math.max(...children.map(getDepth))
   }
 
+  // 🔹 Step 6: Process components
   const visited = new Set()
-  const result = []
+  const hierarchies = []
 
   for (let node of nodes) {
     if (visited.has(node)) continue
@@ -84,67 +102,93 @@ function analyze(input) {
     const comp = new Set()
     const stack = [node]
 
+    // Find connected component
     while (stack.length) {
-      let cur = stack.pop()
-      if (comp.has(cur)) continue
-      comp.add(cur)
+      const curr = stack.pop()
+      if (comp.has(curr)) continue
 
-      for (let c of (graph.get(cur) || [])) stack.push(c)
-      if (parent.has(cur)) stack.push(parent.get(cur))
+      comp.add(curr)
+
+      for (let child of (graph.get(curr) || [])) stack.push(child)
+      if (parent.has(curr)) stack.push(parent.get(curr))
     }
 
     comp.forEach(n => visited.add(n))
 
-    const isCycle = [...comp].some(n => detectCycle(n))
+    const cycle = [...comp].some(n => hasCycle(n))
 
-    let roots = [...comp].filter(n => !parent.has(n) || !comp.has(parent.get(n)))
-    let root = roots.length ? roots.sort()[0] : [...comp].sort()[0]
+    // Find root
+    const roots = [...comp].filter(n => !parent.has(n) || !comp.has(parent.get(n)))
+    const root = roots.length ? roots.sort()[0] : [...comp].sort()[0]
 
-    if (isCycle) {
-      result.push({ root, tree: {}, has_cycle: true })
-    } else {
-      result.push({
+    if (cycle) {
+      hierarchies.push({
         root,
-        tree: { [root]: build(root) },
-        depth: depth(root)
+        tree: {},
+        has_cycle: true
+      })
+    } else {
+      hierarchies.push({
+        root,
+        tree: { [root]: buildTree(root) },
+        depth: getDepth(root)
       })
     }
   }
 
-  result.sort((a, b) => {
+  // 🔹 Step 7: Sort output
+  hierarchies.sort((a, b) => {
     if (!!a.has_cycle !== !!b.has_cycle) return a.has_cycle ? 1 : -1
     return a.root.localeCompare(b.root)
   })
 
-  const trees = result.filter(r => !r.has_cycle)
-  const cycles = result.filter(r => r.has_cycle)
+  const trees = hierarchies.filter(h => !h.has_cycle)
+  const cycles = hierarchies.filter(h => h.has_cycle)
 
-  let largest = ''
+  let largest_tree_root = ''
   if (trees.length) {
     trees.sort((a, b) => b.depth - a.depth || a.root.localeCompare(b.root))
-    largest = trees[0].root
+    largest_tree_root = trees[0].root
   }
 
   return {
     user_id: USER_ID,
     email_id: EMAIL_ID,
     college_roll_number: ROLL,
-    hierarchies: result,
-    invalid_entries: bad,
-    duplicate_edges: dup,
+    hierarchies,
+    invalid_entries,
+    duplicate_edges,
     summary: {
       total_trees: trees.length,
       total_cycles: cycles.length,
-      largest_tree_root: largest
+      largest_tree_root
     }
   }
 }
 
+// 🔹 API Route
 app.post('/bfhl', (req, res) => {
   if (!Array.isArray(req.body.data)) {
-    return res.status(400).json({ error: 'data must be array' })
+    return res.status(400).json({ error: "data must be an array" })
   }
-  res.json(analyze(req.body.data))
+
+  try {
+    const result = analyze(req.body.data)
+    res.json(result)
+  } catch (err) {
+    res.status(500).json({ error: "Internal Server Error" })
+  }
 })
 
-app.listen(3000, () => console.log('Running on 3000'))
+// 🔹 Root Route (for browser check)
+app.get('/', (req, res) => {
+  res.json({
+    status: "BFHL API running 🚀",
+    endpoint: "/bfhl",
+    method: "POST"
+  })
+})
+
+// 🔹 PORT FIX (IMPORTANT FOR DEPLOY)
+const PORT = process.env.PORT || 3000
+app.listen(PORT, () => console.log(`Server running on ${PORT}`))
