@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>BFHL Analyzer</title>
+
+  <style>
+    body {
+      font-family: Arial;
+      background: #0f172a;
+      color: white;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: auto;
+      padding: 20px;
+    }
+
+    textarea {
+      width: 100%;
+      height: 100px;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+
+    button {
+      margin-top: 10px;
+      width: 100%;
+      padding: 10px;
+      background: #38bdf8;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .card {
+      background: #1e293b;
+      padding: 15px;
+      margin-top: 15px;
+      border-radius: 10px;
+    }
+
+    .title {
+      font-weight: bold;
+      margin-bottom: 8px;
+      color: #38bdf8;
+    }
+
+    .error {
+      color: #f87171;
+    }
+
+    ul {
+      padding-left: 20px;
+    }
+
+    pre {
+      background: #020617;
+      padding: 10px;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <h2>🌳 BFHL Hierarchy Analyzer</h2>
+
+  <textarea id="input">A->B, A->C, B->D</textarea>
+  <button onclick="sendData()">Submit</button>
+
+  <div id="output"></div>
+
+</div>
+
+<script>
+async function sendData() {
+  const raw = document.getElementById("input").value;
+  const data = raw.split(",").map(x => x.trim());
+
+  try {
+    const res = await fetch("http://localhost:3000/bfhl", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data })
+    });
+
+    const result = await res.json();
+    render(result);
+
+  } catch {
+    document.getElementById("output").innerHTML =
+      "<div class='card error'>Error connecting to API</div>";
+  }
+}
+
+function render(data) {
+  let html = "";
+
+  // Hierarchies
+  html += `<div class="card"><div class="title">Hierarchies</div>`;
+
+  data.hierarchies.forEach(h => {
+    html += `<div style="margin-bottom:10px;">`;
+    html += `<b>Root:</b> ${h.root}<br>`;
+
+    if (h.has_cycle) {
+      html += `<span class="error">Cycle detected</span>`;
+    } else {
+      html += `<b>Depth:</b> ${h.depth}<br>`;
+      html += `<pre>${JSON.stringify(h.tree, null, 2)}</pre>`;
+    }
+
+    html += `</div>`;
+  });
+
+  html += `</div>`;
+
+  // Summary
+  html += `
+    <div class="card">
+      <div class="title">Summary</div>
+      <ul>
+        <li>Total Trees: ${data.summary.total_trees}</li>
+        <li>Total Cycles: ${data.summary.total_cycles}</li>
+        <li>Largest Tree Root: ${data.summary.largest_tree_root}</li>
+      </ul>
+    </div>
+  `;
+
+  // Invalid
+  if (data.invalid_entries.length) {
+    html += `
+      <div class="card error">
+        <div class="title">Invalid Entries</div>
+        ${data.invalid_entries.join(", ")}
+      </div>
+    `;
+  }
+
+  // Duplicates
+  if (data.duplicate_edges.length) {
+    html += `
+      <div class="card">
+        <div class="title">Duplicate Edges</div>
+        ${data.duplicate_edges.join(", ")}
+      </div>
+    `;
+  }
+
+  document.getElementById("output").innerHTML = html;
+}
+</script>
+
+</body>
+</html>
